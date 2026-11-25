@@ -14,8 +14,8 @@ Ye GitHub ke computers par chalta hai, isliye laptop ya phone on rakhne ki zaroo
 
 ## Auto mode (baad mein)
 
-**3 - Auto Reply** bina dikhaye seedha reply bhejta hai. Har 30 minute apne aap chalana ho to
-`.github/workflows/3-auto-reply.yml` kholiye aur `schedule` wali 2 lines ke aage se `# ` hata dijiye.
+**3 - Auto Reply** chalu hai: har 15 minute naye comments ka seedha reply bhejta hai.
+Band karna ho to: Actions > 3 - Auto Reply > "..." > **Disable workflow**.
 
 ## AI ka andaaz badalna
 

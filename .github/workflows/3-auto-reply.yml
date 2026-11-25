@@ -1,16 +1,15 @@
 name: "3 - Auto Reply (bina dekhe)"
 
-# Abhi ye sirf haath se chalta hai.
-# Har 30 minute apne aap chalana ho to neeche "schedule" wali 2 lines
-# ke aage se "# " hata dijiye.
+# Har 15 minute apne aap chalta hai aur naye comments ka seedha reply bhejta hai.
+# Band karna ho to: Actions > 3 - Auto Reply > "..." > Disable workflow
 
 on:
   workflow_dispatch:
-#  schedule:
-#    - cron: "*/30 * * * *"
+  schedule:
+    - cron: "*/15 * * * *"
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: reply-bot
@@ -33,3 +32,12 @@ jobs:
           FB_PAGE_TOKEN: ${{ secrets.FB_PAGE_TOKEN }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           GEMINI_MODEL: ${{ vars.GEMINI_MODEL }}
+      # Hafte mein ek baar chhota sa update, taaki GitHub 60 din baad schedule band na kare
+      - name: Weekly keep-alive
+        if: always()
+        run: |
+          date -u +%G-W%V > last_active.txt
+          git config user.name "sanjivflix-bot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add last_active.txt
+          git diff --cached --quiet || (git commit -m "Weekly keep-alive" && git push)
