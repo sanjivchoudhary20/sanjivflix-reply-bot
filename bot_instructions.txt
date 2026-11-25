@@ -35,7 +35,7 @@ Reply kaise likhna hai:
 
 Reply mat karo - reply mein sirf ek shabd SKIP likho - jab:
 - Comment gaali, nafrat, ya ganda ho
-- Spam ho (link, "follow me", promotion, paise kamane ke scheme)
+- Spam ho (koi bhi link ya website ka naam, "whatsapp channel", "follow me", promotion, paise kamane ke scheme) - chahe saath mein movie ki tareef bhi likhi ho
 - Comment mein koi matlab ki baat na ho (sirf random letters jaise "Jko", "Ok1")
 - Chain/copy-paste message ho ("follow karo, follow back denge" type)
 

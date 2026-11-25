@@ -11,6 +11,7 @@ Settings GitHub "Secrets" se aati hain - is file mein koi password/token mat lik
 
 import json
 import os
+import re
 import sys
 import time
 from datetime import datetime, timezone, timedelta
@@ -54,6 +55,16 @@ FALLBACK_MODELS = ["gemini-flash-latest", "gemini-flash-lite-latest"]
 LIKE_COMMENTS = env("LIKE_COMMENTS", "true").lower() in ("1", "true", "yes")
 MAX_AGE_HOURS = int(env("MAX_COMMENT_AGE_HOURS", "168"))  # 7 din
 POSTS_TO_CHECK = int(env("POSTS_TO_CHECK", "20"))
+HIDE_LINK_COMMENTS = env("HIDE_LINK_COMMENTS", "true").lower() in ("1", "true", "yes")
+
+# Link pehchanne ka niyam: http, www, .com/.in..., WhatsApp/Telegram links wagairah
+LINK_RE = re.compile(
+    r"(https?://|www\.|wa\.me|t\.me/|chat\.whatsapp|whatsapp\.com|bit\.ly|tinyurl|"
+    r"\b[a-z0-9-]+\s?\.\s?(com|in|net|org|me|ly|link|xyz|site|online|io|co|app|club|top|live|info|shop|store|tk|cc)\b)",
+    re.IGNORECASE)
+OWN_LINK_WORDS = ("sanjivflix",)  # inke links spam nahi maane jaayenge
+SAFE_ATTACHMENTS = {"sticker", "photo", "animated_image_share", "animated_image_autoplay",
+                    "animated_image_video"}
 
 
 def load_secrets(need_ai=True):
@@ -132,8 +143,10 @@ def page_already_replied(comment):
 def pending_comments(limit):
     """Wo comments jinka Page ne abhi tak reply nahi diya (naye pehle)."""
     cutoff = datetime.now(timezone.utc) - timedelta(hours=MAX_AGE_HOURS)
-    fields = "id,message,created_time,from{id,name},comments.limit(100){from{id}}"
+    fields = ("id,message,created_time,is_hidden,attachment{type,url},from{id,name},"
+              "comments.limit(100){from{id}}")
     found, seen = [], set()
+    hidden_now = 0
     for obj_id, caption in recent_objects().items():
         try:
             data = fb_get(f"{obj_id}/comments", {
@@ -149,6 +162,13 @@ def pending_comments(limit):
             seen.add(c["id"])
             if (c.get("from") or {}).get("id") == PAGE_ID:
                 continue  # Page ka apna comment
+            if c.get("is_hidden"):
+                continue  # pehle se hide (Moderation Assist ya bot ne kiya)
+            if has_link(c):
+                print(f"[link/spam] reply nahi hoga: {(c.get('message') or '')[:80]}")
+                if HIDE_LINK_COMMENTS and hide_comment(c["id"]):
+                    hidden_now += 1
+                continue  # link wale comment ka kabhi reply nahi
             if not (c.get("message") or "").strip():
                 continue  # sirf sticker/GIF
             try:
@@ -160,8 +180,34 @@ def pending_comments(limit):
                 continue
             c["_caption"] = caption
             found.append(c)
+    if hidden_now:
+        print(f"🚫 {hidden_now} link/spam comments hide kiye")
+        summary(f"🚫 {hidden_now} link/spam comments hide kiye")
     found.sort(key=lambda c: c.get("created_time", ""), reverse=True)
     return found[:limit]
+
+
+def has_link(c):
+    msg = c.get("message") or ""
+    att = c.get("attachment") or {}
+    if att and att.get("type") not in SAFE_ATTACHMENTS:
+        url = (att.get("url") or "").lower()
+        if not any(w in url for w in OWN_LINK_WORDS):
+            return True  # link ka preview card (jaise WhatsApp channel)
+    for m in LINK_RE.finditer(msg):
+        around = msg[max(0, m.start() - 5): m.end() + 40].lower()
+        if not any(w in around for w in OWN_LINK_WORDS):
+            return True
+    return False
+
+
+def hide_comment(comment_id):
+    try:
+        fb_post(comment_id, {"is_hidden": "true"})
+        return True
+    except FbError as e:
+        print(f"  [hide nahi hua] {e}")
+        return False
 
 
 def still_unreplied(comment_id):
