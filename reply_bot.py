@@ -55,6 +55,7 @@ FALLBACK_MODELS = ["gemini-flash-latest", "gemini-flash-lite-latest"]
 LIKE_COMMENTS = env("LIKE_COMMENTS", "true").lower() in ("1", "true", "yes")
 MAX_AGE_HOURS = int(env("MAX_COMMENT_AGE_HOURS", "168"))  # 7 din
 POSTS_TO_CHECK = int(env("POSTS_TO_CHECK", "20"))
+AUTO_MODE = len(sys.argv) > 1 and sys.argv[1] == "auto"
 HIDE_LINK_COMMENTS = env("HIDE_LINK_COMMENTS", "true").lower() in ("1", "true", "yes")
 
 # Link pehchanne ka niyam: http, www, .com/.in..., WhatsApp/Telegram links wagairah
@@ -271,7 +272,8 @@ def gemini_batch(instructions, items):
     models = [GEMINI_MODEL] + [m for m in FALLBACK_MODELS if m != GEMINI_MODEL]
     models += [m for m in extra_flash_models() if m not in models]
     last_err = "?"
-    for rnd in range(3):  # sab models ke 3 chakkar
+    rounds = 1 if AUTO_MODE else 3  # auto mein 1 chakkar - 15 min baad wese bhi dobara chalega
+    for rnd in range(rounds):
         for model in models:
             url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
             try:
@@ -301,6 +303,8 @@ def gemini_batch(instructions, items):
                 continue
             print(f"  ✓ {model} se reply bane")
             return {int(row["n"]): clean(row.get("reply", "")) for row in rows if "n" in row}
+        if rnd == rounds - 1:
+            break
         wait = 40 * (rnd + 1)
         print(f"  Saare models busy, {wait} sec ruk kar dobara...")
         time.sleep(wait)
