@@ -1,0 +1,42 @@
+name: "1 - Reply Banao"
+
+on:
+  workflow_dispatch:
+    inputs:
+      count:
+        description: "Kitne comments ke reply banane hain? (1-100)"
+        required: true
+        default: "25"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: reply-bot
+  cancel-in-progress: false
+
+jobs:
+  draft:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements.txt
+      - name: AI se reply banao
+        run: python reply_bot.py draft "$COUNT"
+        env:
+          COUNT: ${{ inputs.count }}
+          FB_PAGE_ID: ${{ secrets.FB_PAGE_ID }}
+          FB_PAGE_TOKEN: ${{ secrets.FB_PAGE_TOKEN }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GEMINI_MODEL: ${{ vars.GEMINI_MODEL }}
+      - name: drafts.txt save karo
+        run: |
+          git config user.name "sanjivflix-bot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add drafts.txt
+          git diff --cached --quiet || git commit -m "Naye reply drafts"
+          git push

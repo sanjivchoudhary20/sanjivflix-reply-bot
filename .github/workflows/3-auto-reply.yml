@@ -1,0 +1,35 @@
+name: "3 - Auto Reply (bina dekhe)"
+
+# Abhi ye sirf haath se chalta hai.
+# Har 30 minute apne aap chalana ho to neeche "schedule" wali 2 lines
+# ke aage se "# " hata dijiye.
+
+on:
+  workflow_dispatch:
+#  schedule:
+#    - cron: "*/30 * * * *"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: reply-bot
+  cancel-in-progress: false
+
+jobs:
+  auto:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements.txt
+      - name: Reply banao aur seedha bhejo
+        run: python reply_bot.py auto 30
+        env:
+          FB_PAGE_ID: ${{ secrets.FB_PAGE_ID }}
+          FB_PAGE_TOKEN: ${{ secrets.FB_PAGE_TOKEN }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GEMINI_MODEL: ${{ vars.GEMINI_MODEL }}
