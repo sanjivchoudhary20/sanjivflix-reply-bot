@@ -193,7 +193,8 @@ def gemini_batch(instructions, items):
     prompt = (
         "Neeche SanjivFlix Page par aaye comments ki list hai (JSON). Har item mein "
         "n (number), caption (us post/reel ka caption), name (comment karne wala) aur comment hai.\n"
-        "Har comment ka alag reply likho. Har reply alag aur us comment ke hisaab se ho.\n"
+        "Har comment ka alag reply likho. Is list ke saare reply ek-doosre se bilkul alag hone chahiye - "
+        "koi bhi do reply same line, same shuruaat ya same ending wale na hon. Caption mein movie ka naam ho to use karo.\n"
         "Jis comment ka reply nahi dena, uske reply mein sirf SKIP likho.\n\n" + listing
     )
     body = {
