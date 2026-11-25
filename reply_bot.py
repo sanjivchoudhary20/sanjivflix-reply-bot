@@ -49,6 +49,8 @@ def summary(text):
 # ------------------------------------------------------------------ settings
 PAGE_ID = PAGE_TOKEN = GEMINI_KEY = None
 GEMINI_MODEL = env("GEMINI_MODEL", "gemini-flash-latest")
+# Ek model busy ho to agla try hoga
+FALLBACK_MODELS = ["gemini-flash-latest", "gemini-flash-lite-latest", "gemini-2.5-flash", "gemini-2.5-flash-lite"]
 LIKE_COMMENTS = env("LIKE_COMMENTS", "true").lower() in ("1", "true", "yes")
 MAX_AGE_HOURS = int(env("MAX_COMMENT_AGE_HOURS", "168"))  # 7 din
 POSTS_TO_CHECK = int(env("POSTS_TO_CHECK", "20"))
@@ -187,7 +189,6 @@ def load_instructions():
 
 def gemini_batch(instructions, items):
     """items: [{n, caption, name, comment}] -> {n: reply or None}"""
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent"
     listing = json.dumps(items, ensure_ascii=False, indent=1)
     prompt = (
         "Neeche SanjivFlix Page par aaye comments ki list hai (JSON). Har item mein "
@@ -213,29 +214,42 @@ def gemini_batch(instructions, items):
         },
     }
     headers = {"x-goog-api-key": GEMINI_KEY, "Content-Type": "application/json"}
-    for attempt in range(4):
-        r = requests.post(url, json=body, headers=headers, timeout=180)
-        if r.status_code in (429, 500, 503):
-            wait = 30 * (attempt + 1)
-            print(f"  Gemini busy ({r.status_code}), {wait} sec ruk rahe hain...")
-            time.sleep(wait)
-            continue
-        if r.status_code in (400, 403) and "API key" in r.text:
-            fail("Gemini API key galat hai. GitHub Secret GEMINI_API_KEY check kariye.")
-        if not r.ok:
-            raise RuntimeError(f"Gemini error {r.status_code}: {r.text[:300]}")
-        data = r.json()
-        parts = (((data.get("candidates") or [{}])[0].get("content") or {}).get("parts") or [])
-        text = "".join(p.get("text", "") for p in parts if not p.get("thought")).strip()
-        try:
-            rows = json.loads(text)
-        except json.JSONDecodeError:
-            if attempt < 3:
-                print("  AI ka jawab adhoora aaya, dobara koshish...")
+    models = [GEMINI_MODEL] + [m for m in FALLBACK_MODELS if m != GEMINI_MODEL]
+    last_err = "?"
+    for rnd in range(3):  # sab models ke 3 chakkar
+        for model in models:
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
+            try:
+                r = requests.post(url, json=body, headers=headers, timeout=180)
+            except requests.RequestException as e:
+                last_err = str(e)
+                print(f"  {model}: network error, agla model...")
                 continue
-            raise RuntimeError("AI ka jawab samajh nahi aaya")
-        return {int(row["n"]): clean(row.get("reply", "")) for row in rows if "n" in row}
-    raise RuntimeError("Gemini ne jawab nahi diya (aaj ki free limit khatam ho sakti hai)")
+            if r.status_code in (429, 500, 503, 404):
+                last_err = f"{model} {r.status_code}"
+                print(f"  {model} busy/uplabdh nahi ({r.status_code}), agla model try kar rahe hain...")
+                continue
+            if r.status_code in (400, 403) and "API key" in r.text:
+                fail("Gemini API key galat hai. GitHub Secret GEMINI_API_KEY check kariye.")
+            if not r.ok:
+                last_err = f"{model} {r.status_code}: {r.text[:200]}"
+                print(f"  {model} error {r.status_code}, agla model...")
+                continue
+            data = r.json()
+            parts = (((data.get("candidates") or [{}])[0].get("content") or {}).get("parts") or [])
+            text = "".join(p.get("text", "") for p in parts if not p.get("thought")).strip()
+            try:
+                rows = json.loads(text)
+            except json.JSONDecodeError:
+                last_err = f"{model}: adhoora jawab"
+                print(f"  {model} ka jawab adhoora aaya, agla model...")
+                continue
+            print(f"  ✓ {model} se reply bane")
+            return {int(row["n"]): clean(row.get("reply", "")) for row in rows if "n" in row}
+        wait = 40 * (rnd + 1)
+        print(f"  Saare models busy, {wait} sec ruk kar dobara...")
+        time.sleep(wait)
+    raise RuntimeError(f"Gemini ne jawab nahi diya ({last_err}). Thodi der baad dobara chalaiye.")
 
 
 def clean(text):
@@ -327,7 +341,7 @@ def read_drafts():
 # ------------------------------------------------------------------ modes
 def mode_draft(count):
     load_secrets()
-    print(f"=== Reply Banao: {count} comments tak | model {GEMINI_MODEL} ===")
+    print(f"=== Reply Banao: {count} comments tak ===")
     comments = pending_comments(count)
     if not comments:
         write_drafts([])
