@@ -87,10 +87,17 @@ def fb_request(method, path, params=None):
     params["access_token"] = PAGE_TOKEN
     url = f"{GRAPH}/{path}"
     for attempt in range(3):
-        if method == "GET":
-            r = requests.get(url, params=params, timeout=30)
-        else:
-            r = requests.post(url, data=params, timeout=30)
+        try:
+            if method == "GET":
+                r = requests.get(url, params=params, timeout=60)
+            else:
+                r = requests.post(url, data=params, timeout=60)
+        except requests.RequestException as e:
+            if attempt < 2:
+                print(f"  Facebook se network dikkat ({type(e).__name__}), 15 sec baad dobara...")
+                time.sleep(15)
+                continue
+            raise FbError(f"network: {type(e).__name__}")
         try:
             data = r.json()
         except ValueError:
@@ -483,11 +490,13 @@ def mode_auto(count):
         if not reply:
             continue
         try:
+            if not still_unreplied(c["id"]):
+                continue  # beech mein kisi ne reply kar diya
             send_reply(c["id"], reply)
             sent += 1
             print(f"- bheja: {reply[:80]}")
             time.sleep(3)
-        except FbError as e:
+        except Exception as e:
             print(f"- [fail] {e}")
     summary(f"### 🤖 Auto: {sent} reply bheje")
 
