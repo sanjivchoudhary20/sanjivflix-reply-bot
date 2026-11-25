@@ -50,7 +50,7 @@ def summary(text):
 PAGE_ID = PAGE_TOKEN = GEMINI_KEY = None
 GEMINI_MODEL = env("GEMINI_MODEL", "gemini-flash-latest")
 # Ek model busy ho to agla try hoga
-FALLBACK_MODELS = ["gemini-flash-latest", "gemini-flash-lite-latest", "gemini-2.5-flash", "gemini-2.5-flash-lite"]
+FALLBACK_MODELS = ["gemini-flash-latest", "gemini-flash-lite-latest"]
 LIKE_COMMENTS = env("LIKE_COMMENTS", "true").lower() in ("1", "true", "yes")
 MAX_AGE_HOURS = int(env("MAX_COMMENT_AGE_HOURS", "168"))  # 7 din
 POSTS_TO_CHECK = int(env("POSTS_TO_CHECK", "20"))
