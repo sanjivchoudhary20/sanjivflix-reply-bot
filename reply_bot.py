@@ -262,6 +262,7 @@ def gemini_batch(instructions, items):
     }
     headers = {"x-goog-api-key": GEMINI_KEY, "Content-Type": "application/json"}
     models = [GEMINI_MODEL] + [m for m in FALLBACK_MODELS if m != GEMINI_MODEL]
+    models += [m for m in extra_flash_models() if m not in models]
     last_err = "?"
     for rnd in range(3):  # sab models ke 3 chakkar
         for model in models:
@@ -297,6 +298,32 @@ def gemini_batch(instructions, items):
         print(f"  Saare models busy, {wait} sec ruk kar dobara...")
         time.sleep(wait)
     raise RuntimeError(f"Gemini ne jawab nahi diya ({last_err}). Thodi der baad dobara chalaiye.")
+
+
+_EXTRA = None
+
+
+def extra_flash_models():
+    """Google se poochho abhi kaun-kaun se Flash models chal rahe hain (backup ke liye)."""
+    global _EXTRA
+    if _EXTRA is not None:
+        return _EXTRA
+    _EXTRA = []
+    try:
+        r = requests.get("https://generativelanguage.googleapis.com/v1beta/models",
+                         headers={"x-goog-api-key": GEMINI_KEY}, params={"pageSize": 200}, timeout=30)
+        bad = ("image", "tts", "audio", "live", "embedding", "vision", "thinking", "exp", "robotics", "computer")
+        for m in r.json().get("models", []):
+            name = m.get("name", "").replace("models/", "")
+            if ("flash" in name and "generateContent" in m.get("supportedGenerationMethods", [])
+                    and not any(b in name for b in bad)):
+                _EXTRA.append(name)
+        _EXTRA.sort(reverse=True)  # naye version pehle
+        _EXTRA = _EXTRA[:6]
+        print(f"  Backup models: {', '.join(_EXTRA) or 'koi nahi'}")
+    except Exception as e:
+        print(f"  [models list nahi mili] {e}")
+    return _EXTRA
 
 
 def clean(text):
@@ -445,7 +472,14 @@ def mode_auto(count):
         print("Koi naya comment nahi.")
         return
     sent = 0
-    for c, reply in generate(comments):
+    try:
+        rows = generate(comments)
+    except RuntimeError as e:
+        # Gemini busy - koi baat nahi, 15 minute baad agla run dobara koshish karega
+        print(f"AI abhi busy hai, agle run mein reply jaayenge. ({e})")
+        summary("### ⏳ AI busy tha, agle run mein reply jaayenge")
+        return
+    for c, reply in rows:
         if not reply:
             continue
         try:
