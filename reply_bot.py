@@ -490,6 +490,7 @@ def mode_send():
 
 
 def mode_auto(count):
+    count = min(count, int(env("MAX_REPLIES_PER_RUN", "12")))  # ek run mein 12 se zyada nahi
     load_secrets()
     print(f"=== Auto Reply: {count} comments tak ===")
     comments = pending_comments(count)
