@@ -143,7 +143,11 @@ def recent_objects():
         except FbError as e:
             print(f"[warn] {path} nahi mila: {e}")
             errors.append(str(e))
-    if len(errors) == 2:
+    if len(errors) == 2 and AUTO_MODE:
+        # auto har 15 min chalta hai - fail karke email ki baarish nahi karni, bas saaf likh do
+        print("\n[ERROR] Facebook se posts/reels nahi mil rahe - token ya app mein dikkat hai.\n" + errors[0])
+        summary("### ❌ Facebook token/app mein dikkat - reply nahi ja rahe\n" + errors[0])
+    elif len(errors) == 2:
         fail("Facebook se posts/reels nahi mil rahe - token ya app mein dikkat hai.\n" + errors[0])
     return objs
 
