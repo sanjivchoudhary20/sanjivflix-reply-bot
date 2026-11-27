@@ -4,13 +4,14 @@ SanjivFlix Comment Reply Bot
 3 kaam (mode):
   python reply_bot.py draft 25   -> 25 naye comments ke AI reply banakar drafts.txt mein rakhta hai
   python reply_bot.py send       -> drafts.txt ke saare reply Facebook par ek saath bhej deta hai
-  python reply_bot.py auto 30    -> bina dikhaye seedha reply bana kar bhej deta hai
+  python reply_bot.py auto 12    -> bina dikhaye seedha reply bana kar bhej deta hai
 
 Settings GitHub "Secrets" se aati hain - is file mein koi password/token mat likhna.
 """
 
 import json
 import os
+import random
 import re
 import sys
 import time
@@ -56,6 +57,9 @@ LIKE_COMMENTS = env("LIKE_COMMENTS", "true").lower() in ("1", "true", "yes")
 MAX_AGE_HOURS = int(env("MAX_COMMENT_AGE_HOURS", "168"))  # 7 din
 POSTS_TO_CHECK = int(env("POSTS_TO_CHECK", "20"))
 AUTO_MODE = len(sys.argv) > 1 and sys.argv[1] == "auto"
+# Facebook ko "unusual activity" na lage - ek run mein seemit kaam, beech mein ruk-ruk kar
+MAX_HIDES_PER_RUN = int(env("MAX_HIDES_PER_RUN", "8"))
+POST_GAP_SECONDS = (8, 20)  # har reply ke beech 8-20 sec (random)
 HIDE_LINK_COMMENTS = env("HIDE_LINK_COMMENTS", "true").lower() in ("1", "true", "yes")
 
 # Link pehchanne ka niyam: http, www, .com/.in..., WhatsApp/Telegram links wagairah
@@ -183,8 +187,9 @@ def pending_comments(limit):
                 continue  # pehle se hide (Moderation Assist ya bot ne kiya)
             if has_link(c):
                 print(f"[link/spam] reply nahi hoga: {(c.get('message') or '')[:80]}")
-                if HIDE_LINK_COMMENTS and hide_comment(c["id"]):
+                if HIDE_LINK_COMMENTS and hidden_now < MAX_HIDES_PER_RUN and hide_comment(c["id"]):
                     hidden_now += 1
+                    time.sleep(random.uniform(*POST_GAP_SECONDS))
                 continue  # link wale comment ka kabhi reply nahi
             if not (c.get("message") or "").strip():
                 continue  # sirf sticker/GIF
@@ -474,7 +479,7 @@ def mode_send():
             send_reply(d["id"], d["reply"].strip())
             print(f"- bheja: {d['reply'][:80]}")
             sent += 1
-            time.sleep(3)
+            time.sleep(random.uniform(*POST_GAP_SECONDS))
         except FbError as e:
             print(f"- [fail] {d['id']}: {e}")
             failed += 1
@@ -508,7 +513,7 @@ def mode_auto(count):
             send_reply(c["id"], reply)
             sent += 1
             print(f"- bheja: {reply[:80]}")
-            time.sleep(3)
+            time.sleep(random.uniform(*POST_GAP_SECONDS))
         except Exception as e:
             print(f"- [fail] {e}")
     summary(f"### 🤖 Auto: {sent} reply bheje")
