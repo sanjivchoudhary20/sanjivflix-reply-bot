@@ -114,7 +114,8 @@ def fb_request(method, path, params=None):
         if code == 190:
             fail("Facebook Page Token galat ya expire ho gaya hai. Naya token banakar "
                  "GitHub Secret FB_PAGE_TOKEN mein daaliye.")
-        raise FbError(err.get("message") or f"HTTP {r.status_code}", code)
+        detail = f"{err.get('message') or 'HTTP ' + str(r.status_code)} (code {code}, subcode {err.get('error_subcode')}, type {err.get('type')})"
+        raise FbError(detail, code)
     raise FbError("Facebook ne baar baar mana kiya")
 
 
@@ -133,6 +134,7 @@ def parse_time(s):
 def recent_objects():
     """Page ki latest posts aur reels -> {id: caption}"""
     objs = {}
+    errors = []
     for path, field in ((f"{PAGE_ID}/posts", "message"), (f"{PAGE_ID}/video_reels", "description")):
         try:
             data = fb_get(path, {"fields": f"id,{field},created_time", "limit": POSTS_TO_CHECK})
@@ -140,6 +142,9 @@ def recent_objects():
                 objs.setdefault(p["id"], p.get(field, "") or "")
         except FbError as e:
             print(f"[warn] {path} nahi mila: {e}")
+            errors.append(str(e))
+    if len(errors) == 2:
+        fail("Facebook se posts/reels nahi mil rahe - token ya app mein dikkat hai.\n" + errors[0])
     return objs
 
 
@@ -517,6 +522,18 @@ def main():
         mode_draft(count)
     elif mode == "send":
         mode_send()
+    elif mode == "debug":
+        load_secrets(need_ai=False)
+        for path, params in (("me", {"fields": "id,name"}),
+                             (f"{PAGE_ID}", {"fields": "id,name"}),
+                             (f"{PAGE_ID}/posts", {"limit": 1}),
+                             ("me/permissions", {})):
+            try:
+                print(path, "->", json.dumps(fb_get(path, params))[:400])
+            except FbError as e:
+                print(path, "-> ERROR", e)
+            except SystemExit:
+                print(path, "-> token invalid (190)")
     elif mode == "auto":
         mode_auto(count)
     else:
